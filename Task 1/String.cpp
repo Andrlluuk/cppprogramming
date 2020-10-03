@@ -7,58 +7,98 @@ class String
 private:
     int size;
     char* str;
+    
+    //Memory allocation
+    void allocation(int n)
+    {
+        size = n;
+        str = new char[n];
+    }
+    
+    //Private constructor
+    String(int n)
+    {
+        allocation(n);
+    }
+    
+    vector<int> find_substrings(const String &s)
+    {
+        vector<int> indexes;
+        int n = size;
+        int count = 0;
+        int m = s.size;
+        for(int i = 0; i <= n - m ;i++)
+        {
+            for(int j = 0; j < m; j++)
+            {
+                if(str[i+j] == s.str[j])
+                    count++;
+                else
+                    break;
+            }
+            if(count == s.size)
+            {
+                indexes.push_back(i);
+                i += s.size - 1;
+            }
+            count = 0;
+        }
+        return indexes;
+    }
+    
 public:
     friend std::ostream & operator << (std::ostream &out, const String &s);
-     
+    
     friend std::istream & operator >> (std::istream &in,  String &s);
+    
+    friend String substitution(String& s1, const String &s2, const String &s3);
     
     //default constructor
     String()
     {
         size = 0;
-        str = new char [1];
-        str[0] = '\0';
+        str = new char [0];
     }
     
     //constructor from char
     String(char t)
     {
-        str = new char [2];
+        allocation(1);
         str[0] = t;
-        str[1] = '\0';
-        size = 1;
     }
     
     //constructor from null-terminated string
     String(const char *t)
     {
-        size =(int) strlen(t);
-        str = new char [size + 1];
+        allocation(strlen(t));
         for(int i = 0; i < size; i++)
             str[i] = t[i];
-        str[size] = '\0';
     }
     
     //copy-constructor
     String(const String& s)
     {
-        str = new char [s.size + 1];
-        size = s.size;
+        allocation(s.size);
         for(int i = 0; i < size; i++)
             str[i] = s[i];
-        str[size] = '\0';
     }
     
     //destructor
     ~String()
     {
         delete[] str;
-        size = 0;
     }
     
     //overloaded []
+    char operator[](int idx)
+    {
+        assert((idx >= 0) && (idx < size));
+        return *(str + idx);
+    }
+    
     char operator[](int idx) const
     {
+        assert((idx >= 0) && (idx < size));
         return *(str + idx);
     }
     
@@ -68,13 +108,12 @@ public:
         String s1(str);
         String s2(s);
         delete[] str;
-        str = new char[size+ s.size + 1];
+        str = new char[size + s.size];
         for(int i = 0; i < size; i++)
             str[i] = s1[i];
         for(int i = size; i < size + s.size; i++)
             str[i] = s2[i-size];
         size += s.size;
-        str[size] = '\0';
         return *this;
     }
     
@@ -99,22 +138,19 @@ public:
     
     //overloaded + for constant strings
     String operator +(const char *s)
-      {
-          String ss = *this;
-          String ss2(s);
-          return ss += ss2;
-      }
+    {
+        String ss = *this;
+        String ss2(s);
+        return ss += ss2;
+    }
     
     //overloaded () (to get substring)
     String operator()(int begin, int end) const
     {
         assert((begin >=0) && (end <= size) && (begin <= end));
-        char* part_of_string = new char [end - begin + 1];
+        String news(end - begin);
         for(int i = begin; i < end; i++)
-            part_of_string[i - begin] = str[i];
-        part_of_string[end - begin] = '\0';
-        String news(part_of_string);
-        delete[] part_of_string;
+            news.str[i - begin] = str[i];
         return news;
     }
     
@@ -122,64 +158,47 @@ public:
     String operator*(int x)
     {
         assert(x >= 0);
-        String news(str);
-        if(x == 0)
-        {
-           String news;
-           return news;
-        }
+        String news;
         for(int i = 0; i < x - 1; i++)
             news += str;
         return news;
     }
-    vector<int> entry(const String &s)
-    {
-        vector<int> indexes;
-        int n = size;
-        int count = 0;
-        int m = s.size;
-        for(int i = 0; i <= n - m ;i++)
-        {
-            for(int j = 0; j < m; j++)
-            {
-                if(str[i+j] == s.str[j])
-                    count++;
-                else
-                    break;
-            }
-            if(count == s.size)
-            {
-                indexes.push_back(i);
-                i += s.size - 1;
-            }
-            count = 0;
-        }
-        return indexes;
-    }
+    
+    
     //overloaded - (to delete all substrings)
     String operator-(const String &s)
     {
-        vector<int> indexes = entry(s);
+        vector<int> indexes = find_substrings(s);
         int n = size;
         int count = 0;
+        int idx = 0;
         int m = s.size;
-        for(auto x: indexes)
-            for(int i = x; i < x+m; i++)
-                str[i] = '\0';
         for(int i = 0; i < n; i++)
-            if(str[i] != '\0')
-                count++;
-        char* ss = new char[count];
-        int counter = 0;
-        for(int i = 0; i < n; i++)
-        if(str[i] != '\0')
         {
-            ss[counter] = str[i];
-            counter++;
+            if(i == indexes[idx])
+            {
+                i += m - 1;
+                idx++;
+                while(i < indexes[idx])
+                    idx++;
+            }
+            else
+                count++;
         }
-        String newstr(ss);
-        *this = newstr;
-        delete[] ss;
+        String newstr(count);
+        int counter = 0;
+        idx = 0;
+        for(int i = 0; i < n; i++)
+        {
+            if(i == indexes[idx])
+            {
+                i += m;
+                idx++;
+                while(i < indexes[idx])
+                    idx++;
+            }
+            newstr.str[i] = str[i];
+        }
         return newstr;
     }
     
@@ -187,6 +206,28 @@ public:
     int length() const
     {
         return size;
+    }
+    
+    //Substitution substring by other string
+    String substitution(String& s1, const String &s2, const String &s3)
+    {
+        vector<int> idxs = s1.find_substrings(s2);
+        if(idxs.size())
+        {
+            String final_string = s1(0, idxs[0]);
+            for(int i = 0; i < idxs.size() - 1; i++)
+            {
+                final_string += s3;
+                final_string += s1(idxs[i] + s2.length(), idxs[i + 1]);
+                
+            }
+            final_string += s3;
+            
+            final_string += s1(idxs[idxs.size() - 1] + s2.length(), s1.length());
+            return final_string;
+        }
+        else
+            return s1;
     }
 };
 
@@ -196,34 +237,49 @@ std::ostream& operator << (std::ostream &out, const String &s)
         out << s[i];
     return out;
 }
- 
 std::istream& operator >> (std::istream &in,  String &s)
 {
-    char ss[500];
-    in.getline(ss, sizeof(ss));
+    char ch;
+    int size = 16;
+    int i = 0;
+    char *ss = (char*)malloc(sizeof(char)*size);
+    in >> ch;
+    while(ch != '\n')
+    {
+        ss[i] = ch;
+        in >> ch;
+        i++;
+        if(i == size)
+        {
+            ss = (char*)realloc(ss, sizeof(char)*size*2);
+            size *= 2;
+        }
+    }
     s = ss;
     return in;
 }
+
 String substitution(String& s1, const String &s2, const String &s3)
 {
-    vector<int> idxs = s1.entry(s2);
+    vector<int> idxs = s1.find_substrings(s2);
     if(idxs.size())
     {
-    String final_string = s1(0, idxs[0]);
-    for(int i = 0; i < idxs.size() - 1; i++)
-    {
+        String final_string = s1(0, idxs[0]);
+        for(int i = 0; i < idxs.size() - 1; i++)
+        {
+            final_string += s3;
+            final_string += s1(idxs[i] + s2.length(), idxs[i + 1]);
+            
+        }
         final_string += s3;
-        final_string += s1(idxs[i] + s2.length(), idxs[i + 1]);
         
-    }
-    final_string += s3;
-        
-    final_string += s1(idxs[idxs.size() - 1] + s2.length(), s1.length());
-    return final_string;
+        final_string += s1(idxs[idxs.size() - 1] + s2.length(), s1.length());
+        return final_string;
     }
     else
         return s1;
 }
+
 int main()
 {
     using std::cin;
