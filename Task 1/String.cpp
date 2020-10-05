@@ -1,6 +1,8 @@
 #include<iostream>
 #include<vector>
 #include<cassert>
+#include<cstdio>
+#include<fstream>
 using std::vector;
 class String
 {
@@ -92,13 +94,15 @@ public:
     //overloaded []
     char operator[](int idx)
     {
-        assert((idx >= 0) && (idx < size));
+        if((idx < 0) && (idx >= size))
+            throw "Index out of bounds";
         return *(str + idx);
     }
     
     char operator[](int idx) const
     {
-        assert((idx >= 0) && (idx < size));
+        if((idx < 0) && (idx >= size))
+            throw "Index out of bounds";
         return *(str + idx);
     }
     
@@ -124,7 +128,6 @@ public:
         str = new char[s.size + 1];
         for(int i = 0; i < s.size; i++)
             str[i] = s[i];
-        str[s.size] = '\0';
         size = s.size;
         return *this;
     }
@@ -147,7 +150,8 @@ public:
     //overloaded () (to get substring)
     String operator()(int begin, int end) const
     {
-        assert((begin >=0) && (end <= size) && (begin <= end));
+        if((begin < 0) || (end > size) || (begin > end))
+            throw "Invalid substring request";
         String news(end - begin);
         for(int i = begin; i < end; i++)
             news.str[i - begin] = str[i];
@@ -157,7 +161,8 @@ public:
     //overloaded *(to duplication)
     String operator*(int x)
     {
-        assert(x >= 0);
+        if(x < 0)
+            throw "Can't multiply string by negative number";
         String news;
         for(int i = 0; i < x - 1; i++)
             news += str;
@@ -239,23 +244,16 @@ std::ostream& operator << (std::ostream &out, const String &s)
 }
 std::istream& operator >> (std::istream &in,  String &s)
 {
-    char ch;
-    int size = 16;
-    int i = 0;
-    char *ss = (char*)malloc(sizeof(char)*size);
-    in >> ch;
-    while(ch != '\n')
+    char ss[16];
+    in.getline(ss, 16);
+    s += ss;
+    in.clear();
+    while(strlen(ss) == 15)
     {
-        ss[i] = ch;
-        in >> ch;
-        i++;
-        if(i == size)
-        {
-            ss = (char*)realloc(ss, sizeof(char)*size*2);
-            size *= 2;
-        }
+        in.getline(ss, 16);
+        in.clear();
+        s += ss;
     }
-    s = ss;
     return in;
 }
 
@@ -284,12 +282,21 @@ int main()
 {
     using std::cin;
     using std::cout;
+    using std::endl;
     String s1;
     String s2;
     String s3;
-    cin >> s1;
-    cin >> s2;
-    cin >> s3;
-    String s4 = substitution(s1,s2,s3);
-    cout << s4;
+    try
+    {
+        cin >> s1;
+        cin >> s2;
+        cin >> s3;
+        String s4 = substitution(s1,s2,s3);
+        cout << s4;
+    }
+    catch(const char* exception)
+    {
+        cout << "Error : " << exception << endl;
+    }
+    return 0;
 }
