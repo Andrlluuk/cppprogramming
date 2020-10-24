@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cmath>
 using namespace std;
 
 //Expression base class
@@ -12,6 +13,8 @@ public:
     virtual Expression* derivative(string v) const = 0;
     virtual double eval(string str) const = 0;
     virtual ~Expression() {}
+    virtual Expression* clone() const = 0;
+    friend Expression* simplify(Expression *ex);
 };
 
 //Derived classes
@@ -31,6 +34,7 @@ public:
         return out;
     }
 
+    //derivative builder
     Expression* derivative(string str) const
     {
         return new Number(0);
@@ -46,6 +50,29 @@ public:
     ~Number()
     {}
     
+    //clone function
+    Expression* clone() const
+    {
+        return new Number(num);
+    }
+    
+    //Simplification
+    Expression* simplification() const
+    {
+        return clone();
+    }
+    
+    //Overloaded ==
+    bool operator==(Expression* ex) const
+    {
+        Number* nn = dynamic_cast<Number*>(ex);
+        if (nn == nullptr)
+            return false;
+    else
+    return nn->num == num ;
+    }
+    
+    friend Expression* simplify(Expression *ex);
 };
 
 //Variable class
@@ -72,6 +99,8 @@ public:
 
     double eval(string s) const
     {
+        if(s == "")
+            throw "Wrong evaluation";
         size_t pos = s.find(str);
         if(s.find(';', pos + 1) != string::npos)
         {
@@ -87,6 +116,13 @@ public:
     
     ~Variable()
     {}
+    
+    Expression* clone() const
+    {
+        return new Variable(str);
+    }
+    
+     friend Expression* simplify(Expression *ex);
 };
 
 //addition class
@@ -123,6 +159,23 @@ public:
         delete left;
         delete right;
     }
+    
+    Expression* clone() const
+    {
+        return new Add(left->clone(), right->clone());
+    }
+    
+
+   bool operator==(Expression* ex) const
+   {
+       Add* nn = dynamic_cast<Add*>(ex);
+       if (nn == nullptr)
+           return false;
+   else
+   return nn->left == left && nn->right == right;
+   }
+    
+   friend Expression* simplify(Expression *ex);
 };
 
 //Subtraction class
@@ -159,6 +212,22 @@ public:
         delete left;
         delete right;
     }
+    
+    Expression* clone() const
+    {
+        return new Sub(left->clone(), right->clone());
+    }
+    
+    bool operator==(Expression* ex) const
+    {
+        Sub* nn = dynamic_cast<Sub*>(ex);
+        if (nn == nullptr)
+            return false;
+        else
+            return nn->left == left && nn->right == right;
+    }
+    
+     friend Expression* simplify(Expression *ex);
 };
 
 //Multiplication class
@@ -182,7 +251,7 @@ public:
     
     Expression* derivative(string str) const
     {
-        return new Add(new Mul(left->derivative(str), right), new Mul(left, right->derivative(str)));
+        return new Add(new Mul(left->derivative(str), right->clone()), new Mul(left->clone(), right->derivative(str)));
     }
     
     double eval(string str) const
@@ -195,6 +264,22 @@ public:
         delete left;
         delete right;
     }
+    
+    Expression* clone() const
+    {
+        return new Mul(left->clone(), right->clone());
+    }
+    
+    bool operator==(Expression* ex) const
+    {
+        Mul* nn = dynamic_cast<Mul*>(ex);
+        if (nn == nullptr)
+            return false;
+    else
+    return nn->left == left && nn->right == right;
+    }
+    
+     friend Expression* simplify(Expression *ex);
 };
 
 //Division class
@@ -218,8 +303,8 @@ public:
     
     Expression* derivative(string str) const
     {
-        return new Div(new Sub(new Mul(numerator->derivative(str), denominator), new Mul(numerator, denominator->derivative(str))),
-        new Mul(denominator, denominator));
+        return new Div(new Sub(new Mul(numerator->derivative(str), denominator->clone()), new Mul(numerator->clone(), denominator->derivative(str))),
+        new Mul(denominator->clone(), denominator->clone()));
     }
     
     double eval(string str) const
@@ -233,6 +318,21 @@ public:
         delete denominator;
     }
     
+    Expression* clone() const
+    {
+        return new Div(numerator->clone(), denominator->clone());
+    }
+    
+    bool operator==(Expression* ex) const
+    {
+        Div* nn = dynamic_cast<Div*>(ex);
+        if (nn == nullptr)
+            return false;
+    else
+    return nn->denominator == denominator && nn->numerator == numerator;
+    }
+    
+     friend Expression* simplify(Expression *ex);
 };
 
 /*get type of expression
@@ -323,20 +423,92 @@ Expression* get_expression(string str){
     }
 }
 
+Expression* calculation(Expression* ex)
+{
+    double x;
+    try
+    {
+        x = ex->eval("");
+        return new Number(x);
+    }
+    catch(const char *s)
+    {
+        throw "Cannot calculate expression. Try to simplify it!";
+    }
+}
+
+Expression* simplify(Expression *ex)
+{
+    Variable* variable = dynamic_cast<Variable*>(ex);
+    Number* number = dynamic_cast<Number*>(ex);
+    Add* add = dynamic_cast<Add*>(ex);
+    Mul* mul = dynamic_cast<Mul*>(ex);
+    Sub* sub = dynamic_cast<Sub*>(ex);
+    Div* div = dynamic_cast<Div*>(ex);
+    if(number != nullptr)
+        return ex->clone();
+    if(variable != nullptr)
+        return ex->clone();
+    if(add != nullptr)
+        {
+            add->left = simplify(add->left);
+            add->right = simplify(add->right);
+            Number *l = dynamic_cast<Number*>(add->left);
+            Number *r = dynamic_cast<Number*>(add->right);
+            if(l != nullptr)
+                if(l->num == 0)
+                    return (add->right)->clone();
+            if(r != nullptr)
+                if(r->num == 0)
+                    return (add->left)->clone();
+        }
+        
+        if(sub != nullptr)
+        {
+            sub->left = simplify(sub->left);
+            sub->right = simplify(sub->right);
+            if(sub->left == sub ->right)
+                return new Number(0);
+        }
+        
+        if(mul != nullptr)
+        {
+            mul->left = simplify(mul->left);
+            mul->right = simplify(mul->right);
+            Number* l = dynamic_cast<Number*>(mul->left);
+            Number* r = dynamic_cast<Number*>(mul->right);
+            if(l->num == 1)
+                return (mul->right)->clone();
+            if(r->num == 1)
+                return (mul->left)->clone();
+            if((l->num == 0)||(r->num == 0))
+                return new Number(0);
+        }
+        
+        if(div != nullptr)
+        {
+            div->numerator = simplify(div->numerator);
+            div->denominator = simplify(div->denominator);
+        }
+        return ex->clone();
+}
 
 int main()
 {
     string str;
     cin >> str;
-    
     Expression* e1 = get_expression(str);
-    e1->print(cout);
-    Expression* de1 = e1->derivative("x");
-    de1->print(cout);
-    cout << endl;
-    double res1 = e1->eval("x <- 10; y <- 13");
-    cout << res1;
+    Expression* e2 = simplify(e1);
+    try
+    {
+        double x = e2->eval("");
+        cout << "result of expression: " << x << endl;
+    } catch (const char *s)
+    {
+        cout << "Cannot calculate expression: " << endl;
+        e2->print(cout);
+    }
     delete e1;
+    delete e2;
     return 0;
 }
-
