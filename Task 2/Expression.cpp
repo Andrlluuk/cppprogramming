@@ -14,6 +14,7 @@ public:
     virtual double eval(string str) const = 0;
     virtual ~Expression() {}
     virtual Expression* clone() const = 0;
+    virtual bool equal_to(Expression *ex) const = 0;
     friend Expression* simplify(Expression *ex);
 };
 
@@ -63,7 +64,7 @@ public:
     }
     
     //Overloaded ==
-    bool operator==(Expression* ex) const
+    bool equal_to(Expression* ex) const
     {
         Number* nn = dynamic_cast<Number*>(ex);
         if (nn == nullptr)
@@ -122,6 +123,15 @@ public:
         return new Variable(str);
     }
     
+    bool equal_to(Expression* ex) const
+    {
+        Variable* nn = dynamic_cast<Variable*>(ex);
+        if (nn == nullptr)
+            return false;
+    else
+    return nn->str == str;
+    }
+    
      friend Expression* simplify(Expression *ex);
 };
 
@@ -166,13 +176,13 @@ public:
     }
     
 
-   bool operator==(Expression* ex) const
+   bool equal_to(Expression* ex) const
    {
        Add* nn = dynamic_cast<Add*>(ex);
        if (nn == nullptr)
            return false;
    else
-   return nn->left == left && nn->right == right;
+   return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
    }
     
    friend Expression* simplify(Expression *ex);
@@ -218,13 +228,13 @@ public:
         return new Sub(left->clone(), right->clone());
     }
     
-    bool operator==(Expression* ex) const
+    bool equal_to(Expression* ex) const
     {
         Sub* nn = dynamic_cast<Sub*>(ex);
         if (nn == nullptr)
             return false;
         else
-            return nn->left == left && nn->right == right;
+            return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
     }
     
      friend Expression* simplify(Expression *ex);
@@ -270,13 +280,13 @@ public:
         return new Mul(left->clone(), right->clone());
     }
     
-    bool operator==(Expression* ex) const
+    bool equal_to(Expression* ex) const
     {
         Mul* nn = dynamic_cast<Mul*>(ex);
         if (nn == nullptr)
             return false;
     else
-    return nn->left == left && nn->right == right;
+    return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
     }
     
      friend Expression* simplify(Expression *ex);
@@ -323,13 +333,13 @@ public:
         return new Div(numerator->clone(), denominator->clone());
     }
     
-    bool operator==(Expression* ex) const
+    bool equal_to(Expression* ex) const
     {
         Div* nn = dynamic_cast<Div*>(ex);
         if (nn == nullptr)
             return false;
     else
-    return nn->denominator == denominator && nn->numerator == numerator;
+    return (nn->numerator)->equal_to(numerator) && (nn->denominator)->equal_to(denominator);
     }
     
      friend Expression* simplify(Expression *ex);
@@ -467,7 +477,7 @@ Expression* simplify(Expression *ex)
         {
             sub->left = simplify(sub->left);
             sub->right = simplify(sub->right);
-            if(sub->left == sub ->right)
+            if((sub->left)->equal_to(sub->right))
                 return new Number(0);
         }
         
@@ -477,12 +487,20 @@ Expression* simplify(Expression *ex)
             mul->right = simplify(mul->right);
             Number* l = dynamic_cast<Number*>(mul->left);
             Number* r = dynamic_cast<Number*>(mul->right);
-            if(l->num == 1)
-                return (mul->right)->clone();
-            if(r->num == 1)
-                return (mul->left)->clone();
-            if((l->num == 0)||(r->num == 0))
-                return new Number(0);
+            if(l != nullptr)
+            {
+                if(l->num == 1)
+                    return (mul->right)->clone();
+                if(l->num == 0)
+                    return new Number(0);
+            }
+            if(r != nullptr)
+            {
+                if(r->num == 1)
+                    return (mul->left)->clone();
+                if(r->num == 0)
+                    return new Number(0);
+            }
         }
         
         if(div != nullptr)
