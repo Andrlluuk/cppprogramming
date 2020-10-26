@@ -6,21 +6,21 @@ using namespace std;
 
 //Expression base class
 class Expression
-{;
+{
 public:
-    Expression(){}
     virtual ostream& print(ostream& out) const = 0;
     virtual Expression* derivative(string v) const = 0;
     virtual double eval(string str) const = 0;
     virtual ~Expression() {}
     virtual Expression* clone() const = 0;
-    virtual bool equal_to(Expression *ex) const = 0;
+    virtual bool operator ==(Expression& other) const = 0;
     friend Expression* simplify(Expression *ex);
 };
 
 //Derived classes
 class Number: public Expression
 {
+protected:
     double num;
 public:
     
@@ -64,13 +64,13 @@ public:
     }
     
     //Overloaded ==
-    bool equal_to(Expression* ex) const
+    bool operator ==(Expression& ex) const
     {
-        Number* nn = dynamic_cast<Number*>(ex);
-        if (nn == nullptr)
+        Number& nn = dynamic_cast<Number&>(ex);
+        if (typeid(nn) != typeid(Number))
             return false;
-    else
-    return nn->num == num ;
+        else
+            return (nn.num == num) ;
     }
     
     friend Expression* simplify(Expression *ex);
@@ -123,40 +123,61 @@ public:
         return new Variable(str);
     }
     
-    bool equal_to(Expression* ex) const
+    bool operator ==(Expression& ex) const
     {
-        Variable* nn = dynamic_cast<Variable*>(ex);
-        if (nn == nullptr)
+        Variable& nn = dynamic_cast<Variable&>(ex);
+        if (typeid(nn) != typeid(Variable))
             return false;
-    else
-    return nn->str == str;
+        else
+            return (nn.str == str) ;
     }
     
      friend Expression* simplify(Expression *ex);
 };
 
-//addition class
-class Add: public Expression
+class Binary_operation: public Expression
 {
-    Expression* left;
-    Expression* right;
+protected:
+    Expression *right;
+    Expression *left;
+    char c;
+    Binary_operation(Expression* left, Expression* right, char ch): left(left), right(right), c(ch) {}
 public:
-    Add(Expression* left, Expression* right): left(left), right(right)
-    {}
+    ~Binary_operation()
+    {
+        delete left;
+        delete right;
+    }
 
     ostream& print(ostream& out) const
     {
         out << "(";
         left->print(out);
-        out << "+";
+        out << c;
         right->print(out);
         out << ")";
         return out;
     }
     
+    bool operator ==(Expression& ex) const
+    {
+        if (typeid(ex) != typeid(*this))
+            return false;
+        Binary_operation& x = dynamic_cast<Binary_operation&>(ex);
+        return (*(x.left) == *left && *(x.right) == *right && (x).c == c);
+    }
+};
+
+//addition class
+class Add: public Binary_operation
+{
+    
+public:
+    Add(Expression* left, Expression* right, char c): Binary_operation(left, right, '+'){}
+    
     Expression* derivative(string str) const
     {
-        return new Add(left->derivative(str), right->derivative(str));
+        return new Add(left->derivative(str), right->derivative(str), '+');
     }
     
     double eval(string str) const
@@ -164,52 +185,24 @@ public:
         return left->eval(str) + right->eval(str);
     }
     
-    ~Add()
-    {
-        delete left;
-        delete right;
-    }
-    
     Expression* clone() const
     {
-        return new Add(left->clone(), right->clone());
+           return new Add(left->clone(), right->clone(),'+');
     }
-    
-
-   bool equal_to(Expression* ex) const
-   {
-       Add* nn = dynamic_cast<Add*>(ex);
-       if (nn == nullptr)
-           return false;
-   else
-   return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
-   }
     
    friend Expression* simplify(Expression *ex);
 };
 
 //Subtraction class
-class Sub: public Expression
+class Sub: public Binary_operation
 {
-    Expression *left;
-    Expression *right;
 public:
-    Sub(Expression *left, Expression *right): left(left), right(right)
-    {}
+    Sub(Expression *left, Expression *right, char c): Binary_operation(left, right, '-'){}
 
-    ostream& print(ostream& out) const
-    {
-        out << "(";
-        left->print(out);
-        out << "-";
-        right->print(out);
-        out << ")";
-        return out;
-    }
     
     Expression* derivative(string str) const
     {
-        return new Sub(left->derivative(str), right->derivative(str));
+        return new Sub(left->derivative(str), right->derivative(str), '-');
     }
     
     double eval(string str) const
@@ -217,51 +210,24 @@ public:
          return left->eval(str) - right->eval(str);
     }
     
-    ~Sub()
-    {
-        delete left;
-        delete right;
-    }
-    
     Expression* clone() const
-    {
-        return new Sub(left->clone(), right->clone());
-    }
-    
-    bool equal_to(Expression* ex) const
-    {
-        Sub* nn = dynamic_cast<Sub*>(ex);
-        if (nn == nullptr)
-            return false;
-        else
-            return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
-    }
-    
+       {
+              return new Sub(left->clone(), right->clone(),'-');
+       }
      friend Expression* simplify(Expression *ex);
 };
 
 //Multiplication class
-class Mul: public Expression
+class Mul: public Binary_operation
 {
-    Expression *left;
-    Expression *right;
 public:
-    Mul(Expression *left, Expression *right): left(left), right(right)
+    Mul(Expression *left, Expression *right, char c): Binary_operation(left, right, '*')
     {}
 
-    ostream& print(ostream& out) const
-    {
-        out << "(";
-        left->print(out);
-        out << "*";
-        right->print(out);
-        out << ")";
-        return out;
-    }
     
     Expression* derivative(string str) const
     {
-        return new Add(new Mul(left->derivative(str), right->clone()), new Mul(left->clone(), right->derivative(str)));
+        return new Add(new Mul(left->derivative(str), right->clone(), '*'), new Mul(left->clone(), right->derivative(str), '*'), '+');
     }
     
     double eval(string str) const
@@ -269,91 +235,47 @@ public:
          return left->eval(str) * right->eval(str);
     }
     
-    ~Mul()
-    {
-        delete left;
-        delete right;
-    }
-    
     Expression* clone() const
     {
-        return new Mul(left->clone(), right->clone());
-    }
-    
-    bool equal_to(Expression* ex) const
-    {
-        Mul* nn = dynamic_cast<Mul*>(ex);
-        if (nn == nullptr)
-            return false;
-    else
-    return (nn->left)->equal_to(left) && (nn->right)->equal_to(right);
+           return new Mul(left->clone(), right->clone(),'*');
     }
     
      friend Expression* simplify(Expression *ex);
 };
 
 //Division class
-class Div: public Expression
+class Div: public Binary_operation
 {
-    Expression *numerator;
-    Expression *denominator;
 public:
-    Div(Expression *numerator, Expression *denominator): numerator(numerator), denominator(denominator)
-    {}
-
-    ostream& print(ostream& out) const
-    {
-        out << "(";
-        numerator->print(out);
-        out << "/";
-        denominator->print(out);
-        out << ")";
-        return out;
-    }
+    Div(Expression *left, Expression *right, char c): Binary_operation(left, right, '/'){}
     
     Expression* derivative(string str) const
     {
-        return new Div(new Sub(new Mul(numerator->derivative(str), denominator->clone()), new Mul(numerator->clone(), denominator->derivative(str))),
-        new Mul(denominator->clone(), denominator->clone()));
+        return new Div(new Sub(new Mul(left->derivative(str), right->clone(), '*'), new Mul(left->clone(), right->derivative(str), '*'), '-'),
+        new Mul(left->clone(), left->clone(), '*'),'/');
     }
     
     double eval(string str) const
     {
-         return numerator->eval(str) / denominator->eval(str);
-    }
-    
-    ~Div()
-    {
-        delete numerator;
-        delete denominator;
+         return left->eval(str) / right->eval(str);
     }
     
     Expression* clone() const
-    {
-        return new Div(numerator->clone(), denominator->clone());
-    }
-    
-    bool equal_to(Expression* ex) const
-    {
-        Div* nn = dynamic_cast<Div*>(ex);
-        if (nn == nullptr)
-            return false;
-    else
-    return (nn->numerator)->equal_to(numerator) && (nn->denominator)->equal_to(denominator);
-    }
-    
+       {
+              return new Div(left->clone(), right->clone(),'/');
+       }
+       
      friend Expression* simplify(Expression *ex);
 };
 
 /*get type of expression
  return 1 if expression included outside scopes
  return 0 if not*/
-bool type_of_expression(string str)
+bool include_outside_scopes(string str)
 {
     if((str[0] == '(') && (str[str.length() - 1] == ')'))
     {
         string s = str.substr(1, str.length() - 2);
-        bool ind = 1;
         int cnt = 0;
         for(int i = 0; i < s.length(); i++)
         {
@@ -382,9 +304,9 @@ Expression* get_expression(string str){
             return new Number(stod(str));
         return new Variable(str);
     }
-    if(type_of_expression(str))
+    if(include_outside_scopes(str))
         str = str.substr(1, str.length() - 2);
-    i = str.length();
+    i = str.length() - 1;
     int cnt = 0;
     if (str[i] == '(')
         cnt++;
@@ -404,13 +326,13 @@ Expression* get_expression(string str){
         string left = str.substr(0, i);
         string right = str.substr(i + 1, str.length() - i - 1);
         if (str[i] == '+')
-            return new Add(get_expression(left), get_expression(right));
+            return new Add(get_expression(left), get_expression(right),'+');
         if (str[i] == '-')
-            return new Sub(get_expression(left), get_expression(right));
+            return new Sub(get_expression(left), get_expression(right),'-');
         }
     {
         cnt = 0;
-        i = str.length();
+        i = str.length() - 1;
         
         if (str[i] == '(')
             cnt++;
@@ -428,8 +350,8 @@ Expression* get_expression(string str){
         string left = str.substr(0, i);
         string right = str.substr(i + 1, str.length() - i - 1);
     if (str[i] == '*')
-        return new Mul(get_expression(left), get_expression(right));
-    return new Div(get_expression(left), get_expression(right));
+        return new Mul(get_expression(left), get_expression(right),'*');
+    return new Div(get_expression(left), get_expression(right), '/');
     }
 }
 
@@ -445,6 +367,13 @@ Expression* calculation(Expression* ex)
     {
         throw "Cannot calculate expression. Try to simplify it!";
     }
+}
+
+
+Expression* return_new_expression(Expression *expr)
+{
+    Expression *ex = expr->clone();
+    return simplify(ex);
 }
 
 Expression* simplify(Expression *ex)
@@ -477,7 +406,7 @@ Expression* simplify(Expression *ex)
         {
             sub->left = simplify(sub->left);
             sub->right = simplify(sub->right);
-            if((sub->left)->equal_to(sub->right))
+            if(*(sub->left) == *(sub->right))
                 return new Number(0);
         }
         
@@ -505,8 +434,8 @@ Expression* simplify(Expression *ex)
         
         if(div != nullptr)
         {
-            div->numerator = simplify(div->numerator);
-            div->denominator = simplify(div->denominator);
+            div->right = simplify(div->right);
+            div->left = simplify(div->left);
         }
         return ex->clone();
 }
@@ -516,7 +445,7 @@ int main()
     string str;
     cin >> str;
     Expression* e1 = get_expression(str);
-    Expression* e2 = simplify(e1);
+    Expression* e2 = return_new_expression(e1);
     try
     {
         double x = e2->eval("");
