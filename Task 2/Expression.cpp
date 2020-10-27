@@ -172,8 +172,9 @@ public:
 class Add: public Binary_operation
 {
     
-public:
+private:
     Add(Expression* left, Expression* right, char c): Binary_operation(left, right, '+'){}
+public:
     
     Expression* derivative(string str) const
     {
@@ -191,14 +192,18 @@ public:
     }
     
    friend Expression* simplify(Expression *ex);
+   friend Expression* get_expression(string str);
+   friend class Sub;
+   friend class Mul;
+   friend class Div;
 };
 
 //Subtraction class
 class Sub: public Binary_operation
 {
-public:
+private:
     Sub(Expression *left, Expression *right, char c): Binary_operation(left, right, '-'){}
-
+public:
     
     Expression* derivative(string str) const
     {
@@ -214,16 +219,20 @@ public:
        {
               return new Sub(left->clone(), right->clone(),'-');
        }
-     friend Expression* simplify(Expression *ex);
+    friend Expression* simplify(Expression *ex);
+    friend Expression* get_expression(string str);
+    friend class Add;
+    friend class Mul;
+    friend class Div;
 };
 
 //Multiplication class
 class Mul: public Binary_operation
 {
-public:
+private:
     Mul(Expression *left, Expression *right, char c): Binary_operation(left, right, '*')
     {}
-
+public:
     
     Expression* derivative(string str) const
     {
@@ -240,15 +249,20 @@ public:
            return new Mul(left->clone(), right->clone(),'*');
     }
     
-     friend Expression* simplify(Expression *ex);
+    friend Expression* simplify(Expression *ex);
+    friend Expression* get_expression(string str);
+    friend class Add;
+    friend class Sub;
+    friend class Div;
 };
 
 //Division class
 class Div: public Binary_operation
 {
-public:
+private:
     Div(Expression *left, Expression *right, char c): Binary_operation(left, right, '/'){}
     
+public:
     Expression* derivative(string str) const
     {
         return new Div(new Sub(new Mul(left->derivative(str), right->clone(), '*'), new Mul(left->clone(), right->derivative(str), '*'), '-'),
@@ -265,7 +279,11 @@ public:
               return new Div(left->clone(), right->clone(),'/');
        }
        
-     friend Expression* simplify(Expression *ex);
+    friend Expression* simplify(Expression *ex);
+    friend Expression* get_expression(string str);
+    friend class Add;
+    friend class Sub;
+    friend class Mul;
 };
 
 /*get type of expression
