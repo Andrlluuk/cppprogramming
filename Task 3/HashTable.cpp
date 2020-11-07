@@ -20,8 +20,8 @@ struct Node
 template<typename K, typename V>
 Node<K,V>* create(K& k, V& v)
 {
-   Node<K,V>* node = new Node<K,V>(k,v);
-   return node;
+    Node<K,V>* node = new Node<K,V>(k,v);
+    return node;
 }
 
 template<typename K, typename V>
@@ -79,7 +79,7 @@ public:
         return head;
     }
     
-   class List_Iterator
+    class List_Iterator
     {
         friend class LinkedList<K,V>;
         
@@ -264,13 +264,13 @@ public:
         auto it = arr[key].begin();
         if(it.isNullptr())
             return;
-         while ((!it.isNullptr()) && ((*it).first == k))
-         {
-                arr[key].set_head(it.curr->next);
-                delete (it.curr);
-                it = arr[key].begin();
-                capacity--;
-         }
+        while ((!it.isNullptr()) && ((*it).first == k))
+        {
+            arr[key].set_head(it.curr->next);
+            delete (it.curr);
+            it = arr[key].begin();
+            capacity--;
+        }
         auto prev = it;
         it++;
         while (!it.isNullptr())
@@ -290,7 +290,7 @@ public:
                 it++;
                 prev++;
             }
-
+            
         }
     }
     
@@ -301,81 +301,81 @@ public:
     
     class Iterator {
     private:
-            friend class HashMap<K, V>;
-            LinkedList<K, V> *arr;
+        friend class HashMap<K, V>;
+        LinkedList<K, V> *arr;
         typename LinkedList<K,V>::List_Iterator List_Iterator;
-            unsigned data_id;
-            unsigned data_size;
+        unsigned data_id;
+        unsigned data_size;
     public:
         
-
-            pair<K, V> &operator*() {
-                return (*List_Iterator);
-            }
-
-            Iterator &operator++(int) {
-                List_Iterator++;
-                if (List_Iterator.isNullptr()) {
+        
+        pair<K, V> &operator*() {
+            return (*List_Iterator);
+        }
+        
+        Iterator &operator++(int) {
+            List_Iterator++;
+            if (List_Iterator.isNullptr()) {
+                data_id++;
+                while (data_id < data_size && arr[data_id].isEmpty())
                     data_id++;
-                    while (data_id < data_size && arr[data_id].isEmpty())
-                        data_id++;
-                    if (data_id != data_size)
-                        List_Iterator = arr[data_id].begin();
-                }
-                return *this;
+                if (data_id != data_size)
+                    List_Iterator = arr[data_id].begin();
             }
-
-            bool operator!=(const Iterator &other) const
+            return *this;
+        }
+        
+        bool operator!=(const Iterator &other) const
         {
-                if (data_id != other.data_id)
-                    return true;
-                return (this->List_Iterator != other.List_Iterator);
+            if (data_id != other.data_id)
+                return true;
+            return (this->List_Iterator != other.List_Iterator);
         }
-
-            bool operator==(const Iterator &other) const
+        
+        bool operator==(const Iterator &other) const
         {
-                return (this->List_Iterator == other.List_Iterator);
-            }
-        };
-
-        Iterator begin() {
-            if (capacity == 0)
-                return end();
-            Iterator it;
-            it.arr = arr;
-            it.data_size = size;
-            for (unsigned id = 0; id < size; id++) {
-                if (!arr[id].isEmpty()) {
-                    it.data_id = id;
-                    it.List_Iterator = arr[id].begin();
-                    break;
-                }
-            }
-            return it;
-        }
-
-        Iterator end() {
-            Iterator it;
-            it.arr = nullptr;
-            it.data_size = size;
-            it.data_id = size;
-            return it;
-        }
-
-        size_t countValues() {
-            return capacity;
-        }
-
-        size_t countUniqueValues() {
-            if (countValues()==0)
-                return 0;
-            HashMap<V, V> map(size, max_occupancy);
-            for (auto it = this->begin(); it != this->end(); it++) {
-                map.insert((*it).second, (*it).second);
-            }
-            return map.countValues();
+            return (this->List_Iterator == other.List_Iterator);
         }
     };
+    
+    Iterator begin() {
+        if (capacity == 0)
+            return end();
+        Iterator it;
+        it.arr = arr;
+        it.data_size = size;
+        for (unsigned id = 0; id < size; id++) {
+            if (!arr[id].isEmpty()) {
+                it.data_id = id;
+                it.List_Iterator = arr[id].begin();
+                break;
+            }
+        }
+        return it;
+    }
+    
+    Iterator end() {
+        Iterator it;
+        it.arr = nullptr;
+        it.data_size = size;
+        it.data_id = size;
+        return it;
+    }
+    
+    size_t countValues() {
+        return capacity;
+    }
+    
+    size_t countUniqueValues() {
+        if (countValues()==0)
+            return 0;
+        HashMap<V, V> map(size, max_occupancy);
+        for (auto it = this->begin(); it != this->end(); it++) {
+            map.insert((*it).second, (*it).second);
+        }
+        return map.countValues();
+    }
+};
 
 template<typename Key, typename Value>
 void build()
@@ -427,4 +427,4 @@ int main()
         build<string,double>();
     
     return 0;
- }
+}

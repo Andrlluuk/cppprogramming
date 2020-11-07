@@ -1,11 +1,7 @@
-#include<iostream>
-#include<string>
-#include<iostream>
-#include<vector>
-#include<cassert>
-#include<cstdio>
-#include<fstream>
-#include "String_class.h"
+
+
+#ifndef HashMap_h
+#define HashMap_h
 
 using namespace std;
 
@@ -210,7 +206,7 @@ unsigned int division_hash(size_t key, int size)
 template<typename K, typename V>
 class HashMap
 {
-private:
+protected:
     double max_occupancy;
     int capacity;
     int size;
@@ -306,7 +302,7 @@ public:
     }
     
     class Iterator {
-    private:
+    protected:
         friend class HashMap<K, V>;
         LinkedList<K, V> *arr;
         typename LinkedList<K,V>::List_Iterator List_Iterator;
@@ -383,60 +379,6 @@ public:
     }
 };
 
-template<typename Key, typename Value>
-void build()
-{
-    int n;
-    Key key;
-    Value value;
-    cin >> n;
-    char c;
-    HashMap<Key, Value> hashtable(n, 0.75);
-    while(n--)
-    {
-        cin >> c;
-        if(c == 'A')
-        {
-            cin >> key;
-            cin >> value;
-            hashtable.insert(key,value);
-        }
-        else
-        {
-            cin >> key;
-            hashtable.remove(key);
-        }
-    }
-    cout << hashtable.countValues() << " " << hashtable.countUniqueValues() << endl;
-}
 
-int main()
-{
-    char k, v;
-    cin >> k >> v;
-    if((k == 'I') && (v == 'S'))
-        build<int,string>();
-    if((k == 'S') && (v == 'S'))
-        build<string,string>();
-    if((k == 'D') && (v == 'S'))
-        build<double,string>();
-    if((k == 'I') && (v == 'I'))
-        build<int,int>();
-    if((k == 'I') && (v == 'D'))
-        build<int,double>();
-    if((k == 'D') && (v == 'I'))
-        build<double,int>();
-    if((k == 'S') && (v == 'I'))
-        build<string,int>();
-    if((k == 'D') && (v == 'D'))
-        build<double,double>();
-    if((k == 'S') && (v == 'D'))
-        build<string,double>();
-    if((k == 'O') && (v == 'D'))
-        build<String,double>();
-    if((k == 'O') && (v == 'I'))
-        build<String,double>();
-    if((k == 'O') && (v == 'S'))
-        build<String,double>();
-    return 0;
-}
+#endif /* HashMap_h */
+
