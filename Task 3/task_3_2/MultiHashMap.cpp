@@ -119,28 +119,32 @@ void Multibuild()
 }
 
 
+template<typename Key>
+void get_value()
+{
+    char v;
+    cin >> v;
+    if(v == 'I')
+        Multibuild<Key,int>();
+    if(v == 'S')
+        Multibuild<Key,string>();
+    if(v == 'D')
+        Multibuild<Key,double>();
+}
+
 int main()
 {
-    char k, v;
-    cin >> k >> v;
-    if((k == 'I') && (v == 'S'))
-        Multibuild<int,string>();
-    if((k == 'S') && (v == 'S'))
-        Multibuild<string,string>();
-    if((k == 'D') && (v == 'S'))
-        Multibuild<double,string>();
-    if((k == 'I') && (v == 'I'))
-        Multibuild<int,int>();
-    if((k == 'I') && (v == 'D'))
-        Multibuild<int,double>();
-    if((k == 'D') && (v == 'I'))
-        Multibuild<double,int>();
-    if((k == 'S') && (v == 'I'))
-        Multibuild<string,int>();
-    if((k == 'D') && (v == 'D'))
-        Multibuild<double,double>();
-    if((k == 'S') && (v == 'D'))
-        Multibuild<string,double>();
+    char k;
+    cin >> k;
+    if(k == 'I')
+        get_value<int>();
+    if(k == 'S')
+        get_value<string>();
+    if(k == 'D')
+        get_value<double>();
+    if(k == 'O')
+        get_value<String>();
+    return 0;
     
     return 0;
 }

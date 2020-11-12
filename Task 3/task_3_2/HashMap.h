@@ -22,8 +22,7 @@ struct Node
 template<typename K, typename V>
 Node<K,V>* create(K& k, V& v)
 {
-    Node<K,V>* node = new Node<K,V>(k,v);
-    return node;
+    return new Node<K,V>(k,v);
 }
 
 template<typename K, typename V>
@@ -103,11 +102,6 @@ public:
             curr = list.head;
         }
         
-        pair<K,V> &operator*()
-        {
-            return this->curr->s;
-        }
-        
         List_Iterator& operator++(int)
         {
             if(curr == nullptr)
@@ -117,6 +111,15 @@ public:
             return *this;
         }
         
+        pair<K,V>* operator->() const
+        {
+            return &((*curr).s);
+        }
+        
+        pair<K,V>& operator*() const
+        {
+            return curr->s;
+        }
         bool operator !=(List_Iterator other) const
         {
             return this->curr != other.curr;
@@ -149,7 +152,7 @@ public:
     {
         for(List_Iterator it = this->begin(); it != this->end(); it++)
         {
-            if((*it).first == k)
+            if(it->first == k)
             {
                 return it.curr;
             }
@@ -159,7 +162,7 @@ public:
     
     void deleteByValue(V& v)
     {
-        if((*begin()).second == v)
+        if(begin()->second == v)
         {
             Node<K,V> *ptr = head;
             head = head->next;
@@ -172,7 +175,7 @@ public:
         iter++;
         while(iter != end())
         {
-            if((*iter).second == v)
+            if(iter->second == v)
             {
                 prev.curr->next = iter.curr->next;
                 delete iter.curr;
@@ -181,7 +184,7 @@ public:
             iter++;
             prev++;
         }
-        if((*iter).second == v)
+        if(iter->second == v)
         {
             prev.curr->next = nullptr;
             delete iter.curr;
@@ -197,16 +200,10 @@ public:
 
 
 
-
-unsigned int division_hash(size_t key, int size)
-{
-    return key % size;
-}
-
 template<typename K, typename V>
 class HashMap
 {
-protected:
+private:
     double max_occupancy;
     int capacity;
     int size;
@@ -218,7 +215,7 @@ protected:
         HashMap<K,V>* newHashMap = new HashMap(size * 2, max_occupancy);
         for(auto iter = this->begin(); iter != this->end(); iter++)
         {
-            newHashMap->insert((*iter).first, (*iter).second);
+            newHashMap->insert(iter->first, iter->second);
         }
         auto temp = this->arr;
         this->arr = newHashMap->arr;
@@ -228,6 +225,12 @@ protected:
         newHashMap->size /= 2;
         delete newHashMap;
     }
+    
+    unsigned int division_hash(size_t key, int size)
+    {
+        return key % size;
+    }
+    
 public:
     
     
@@ -246,7 +249,7 @@ public:
             arr[i].delete_list();
         delete[] arr;
     }
-    void insert(K& k, V& v)
+    virtual void insert(K& k, V& v)
     {
         unsigned int key = division_hash(hsh(k), size);
         if(arr[key].searchByKey(k) != nullptr)
@@ -256,17 +259,17 @@ public:
         }
         arr[key].push(k,v);
         capacity++;
-        if ((double) capacity / (double) size >= 0.75)
+        if ((double) capacity / (double) size >= max_occupancy)
             rehash();
     }
     
-    void remove(K& k)
+    virtual void remove(K& k)
     {
         unsigned int key = division_hash(hsh(k), size);
         auto it = arr[key].begin();
         if(it.isNullptr())
             return;
-        while ((!it.isNullptr()) && ((*it).first == k))
+        if((!it.isNullptr()) && (it->first == k))
         {
             arr[key].set_head(it.curr->next);
             delete (it.curr);
@@ -277,7 +280,7 @@ public:
         it++;
         while (!it.isNullptr())
         {
-            if ((*it).first == k)
+            if (it->first == k)
             {
                 prev.curr->next = it.curr->next;
                 auto ptr = it.curr;
@@ -298,11 +301,13 @@ public:
     
     V getValueByKey(K &k) {
         unsigned int key = division_hash(hsh(k), size);
+        if(arr[key].searchByKey(k) == nullptr)
+            throw "Hashtable doesn't include Value with this Key";
         return arr[key].searchByKey(k)->s.second;
     }
     
     class Iterator {
-    protected:
+    private:
         friend class HashMap<K, V>;
         LinkedList<K, V> *arr;
         typename LinkedList<K,V>::List_Iterator List_Iterator;
@@ -311,8 +316,12 @@ public:
     public:
         
         
-        pair<K, V> &operator*() {
+        pair<K, V>& operator*() {
             return (*List_Iterator);
+        }
+        
+        pair<K, V>* operator->() {
+            return &(*List_Iterator);
         }
         
         Iterator &operator++(int) {
@@ -373,7 +382,7 @@ public:
             return 0;
         HashMap<V, V> map(size, max_occupancy);
         for (auto it = this->begin(); it != this->end(); it++) {
-            map.insert((*it).second, (*it).second);
+            map.insert(it->second, it->second);
         }
         return map.countValues();
     }

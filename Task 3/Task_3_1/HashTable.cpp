@@ -1,6 +1,5 @@
 #include<iostream>
 #include<string>
-#include<iostream>
 #include<vector>
 #include<cassert>
 #include<cstdio>
@@ -26,8 +25,7 @@ struct Node
 template<typename K, typename V>
 Node<K,V>* create(K& k, V& v)
 {
-    Node<K,V>* node = new Node<K,V>(k,v);
-    return node;
+    return new Node<K,V>(k,v);
 }
 
 template<typename K, typename V>
@@ -107,11 +105,6 @@ public:
             curr = list.head;
         }
         
-        pair<K,V> &operator*()
-        {
-            return this->curr->s;
-        }
-        
         List_Iterator& operator++(int)
         {
             if(curr == nullptr)
@@ -121,6 +114,15 @@ public:
             return *this;
         }
         
+        pair<K,V>* operator->() const
+        {
+            return &((*curr).s);
+        }
+        
+        pair<K,V>& operator*() const
+        {
+            return curr->s;
+        }
         bool operator !=(List_Iterator other) const
         {
             return this->curr != other.curr;
@@ -153,7 +155,7 @@ public:
     {
         for(List_Iterator it = this->begin(); it != this->end(); it++)
         {
-            if((*it).first == k)
+            if(it->first == k)
             {
                 return it.curr;
             }
@@ -163,7 +165,7 @@ public:
     
     void deleteByValue(V& v)
     {
-        if((*begin()).second == v)
+        if(begin()->second == v)
         {
             Node<K,V> *ptr = head;
             head = head->next;
@@ -176,7 +178,7 @@ public:
         iter++;
         while(iter != end())
         {
-            if((*iter).second == v)
+            if(iter->second == v)
             {
                 prev.curr->next = iter.curr->next;
                 delete iter.curr;
@@ -185,7 +187,7 @@ public:
             iter++;
             prev++;
         }
-        if((*iter).second == v)
+        if(iter->second == v)
         {
             prev.curr->next = nullptr;
             delete iter.curr;
@@ -200,12 +202,6 @@ public:
 };
 
 
-
-
-unsigned int division_hash(size_t key, int size)
-{
-    return key % size;
-}
 
 template<typename K, typename V>
 class HashMap
@@ -222,7 +218,7 @@ private:
         HashMap<K,V>* newHashMap = new HashMap(size * 2, max_occupancy);
         for(auto iter = this->begin(); iter != this->end(); iter++)
         {
-            newHashMap->insert((*iter).first, (*iter).second);
+            newHashMap->insert(iter->first, iter->second);
         }
         auto temp = this->arr;
         this->arr = newHashMap->arr;
@@ -232,6 +228,12 @@ private:
         newHashMap->size /= 2;
         delete newHashMap;
     }
+    
+    unsigned int division_hash(size_t key, int size)
+    {
+        return key % size;
+    }
+    
 public:
     
     
@@ -260,7 +262,7 @@ public:
         }
         arr[key].push(k,v);
         capacity++;
-        if ((double) capacity / (double) size >= 0.75)
+        if ((double) capacity / (double) size >= max_occupancy)
             rehash();
     }
     
@@ -270,7 +272,7 @@ public:
         auto it = arr[key].begin();
         if(it.isNullptr())
             return;
-        while ((!it.isNullptr()) && ((*it).first == k))
+        if((!it.isNullptr()) && (it->first == k))
         {
             arr[key].set_head(it.curr->next);
             delete (it.curr);
@@ -281,7 +283,7 @@ public:
         it++;
         while (!it.isNullptr())
         {
-            if ((*it).first == k)
+            if (it->first == k)
             {
                 prev.curr->next = it.curr->next;
                 auto ptr = it.curr;
@@ -302,6 +304,8 @@ public:
     
     V getValueByKey(K &k) {
         unsigned int key = division_hash(hsh(k), size);
+        if(arr[key].searchByKey(k) == nullptr)
+            throw "Hashtable doesn't include Value with this Key";
         return arr[key].searchByKey(k)->s.second;
     }
     
@@ -315,8 +319,12 @@ public:
     public:
         
         
-        pair<K, V> &operator*() {
+        pair<K, V>& operator*() {
             return (*List_Iterator);
+        }
+        
+        pair<K, V>* operator->() {
+            return &(*List_Iterator);
         }
         
         Iterator &operator++(int) {
@@ -377,13 +385,13 @@ public:
             return 0;
         HashMap<V, V> map(size, max_occupancy);
         for (auto it = this->begin(); it != this->end(); it++) {
-            map.insert((*it).second, (*it).second);
+            map.insert(it->second, it->second);
         }
         return map.countValues();
     }
 };
 
-template<typename Key, typename Value>
+template<typename Key,typename Value>
 void build()
 {
     int n;
@@ -391,6 +399,7 @@ void build()
     Value value;
     cin >> n;
     char c;
+    
     HashMap<Key, Value> hashtable(n, 0.75);
     while(n--)
     {
@@ -407,36 +416,42 @@ void build()
             hashtable.remove(key);
         }
     }
+    try
+    {
+        hashtable.getValueByKey(key);
+    }
+    catch(const char *ex)
+    {
+        cout << ex << endl;;
+    }
     cout << hashtable.countValues() << " " << hashtable.countUniqueValues() << endl;
+}
+
+template<typename Key>
+void get_value()
+{
+    char v;
+    cin >> v;
+    if(v == 'I')
+        build<Key,int>();
+    if(v == 'S')
+        build<Key,string>();
+    if(v == 'D')
+        build<Key,double>();
 }
 
 int main()
 {
-    char k, v;
-    cin >> k >> v;
-    if((k == 'I') && (v == 'S'))
-        build<int,string>();
-    if((k == 'S') && (v == 'S'))
-        build<string,string>();
-    if((k == 'D') && (v == 'S'))
-        build<double,string>();
-    if((k == 'I') && (v == 'I'))
-        build<int,int>();
-    if((k == 'I') && (v == 'D'))
-        build<int,double>();
-    if((k == 'D') && (v == 'I'))
-        build<double,int>();
-    if((k == 'S') && (v == 'I'))
-        build<string,int>();
-    if((k == 'D') && (v == 'D'))
-        build<double,double>();
-    if((k == 'S') && (v == 'D'))
-        build<string,double>();
-    if((k == 'O') && (v == 'D'))
-        build<String,double>();
-    if((k == 'O') && (v == 'I'))
-        build<String,double>();
-    if((k == 'O') && (v == 'S'))
-        build<String,double>();
+    char k;
+    cin >> k;
+    if(k == 'I')
+        get_value<int>();
+    if(k == 'S')
+        get_value<string>();
+    if(k == 'D')
+        get_value<double>();
+    if(k == 'O')
+        get_value<String>();
     return 0;
+    
 }
