@@ -299,11 +299,17 @@ public:
         }
     }
     
-    V getValueByKey(K &k) {
+   Iterator getValueByKey(K &k)
+    {
         unsigned int key = division_hash(hsh(k), size);
+        Iterator it;
         if(arr[key].searchByKey(k) == nullptr)
-            throw "Hashtable doesn't include Value with this Key";
-        return arr[key].searchByKey(k)->s.second;
+            return it.end();
+        V v = arr[key].searchByKey(k)->s.second
+        for (auto it = this->begin(); it != this->end(); it++)
+            if(v == it->second)
+                return it;
+        return it.end();
     }
     
     class Iterator {
