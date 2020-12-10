@@ -6,49 +6,47 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <sstream>
 using namespace std;
 
 bool is_digit(char c)
 {
     return isdigit(c) || (c == '-');
 }
+
+
+class Expression;
+
+typedef unordered_map<string, Expression*> Env;
+
+
 class Expression
 {
 public:
     virtual ~Expression(){}
-    virtual Expression* eval() = 0;
+    virtual Expression* eval(Env& env) = 0;
     virtual Expression* clone() const = 0;
     virtual ostream& print(ostream& out) const = 0;
-};
-
-class Env
-{
-public:
-    unordered_map<string, Expression*> env;
-
-    Expression* fromEnv(string& s)
-    {
-        return env[s];
-    }
 };
 
 
 class Val: public Expression
 {
-public:
+
     int val;
-    Env* data;
     
-    Val(int i, Env* data):val(i), data(data){};
+public:
     
-    Expression* eval()
+    Val(int i):val(i){};
+    
+    Expression* eval(Env& env)
     {
         return clone();
     }
     
     Expression* clone() const
     {
-        return new Val(val, data);
+        return new Val(val);
     }
     
     ostream& print(ostream& out) const
@@ -56,6 +54,8 @@ public:
         out << "(val " << val << ")";
         return out;
     }
+    
+    friend int getValue(Expression* ex);
 };
 
 int getValue(Expression *ex)
@@ -64,7 +64,12 @@ int getValue(Expression *ex)
     if(i != nullptr)
         return i->val;
     else
-        throw "Call getValue function from non-val object";
+    {
+        ostringstream out;
+        ex->print(out);
+        throw invalid_argument("Try to call getValue function from " + out.str());
+    }
+        
 }
 
 
@@ -72,29 +77,28 @@ class Var :public Expression
 {
 protected:
     string id;
-    Env* data;
     friend class Call;
 public:
     
-    Var(string s, Env* e): id(s), data(e)
+    Var(string s): id(s)
     {}
     
-    Expression* eval()
+    Expression* eval(Env& env)
     {
-        try
-        {
-            Expression* x = data->fromEnv(id);
+        Expression* x = env[id];
+        if(x != NULL)
             return x;
-        }
-        catch(...)
+        else
         {
-            throw "Haven't found expression for this id";
+            ostringstream out;
+            this->print(out);
+            throw invalid_argument("Try to call eval function in Var class from " + out.str() + " and didn't find evaluation of this expression");
         }
     }
     
     Expression* clone() const
     {
-        return new Var(id, data);
+        return new Var(id);
     }
     
     ostream& print(ostream& out) const
@@ -109,9 +113,8 @@ class Add: public Expression
 {
     Expression* right;
     Expression* left;
-    Env* data;
 public:
-    Add(Expression* left, Expression* right, Env* data):left(left), right(right), data(data){}
+    Add(Expression* left, Expression* right): left(left), right(right){}
     
     ~Add()
     {
@@ -119,14 +122,14 @@ public:
         delete right;
     }
     
-    Expression* eval()
+    Expression* eval(Env& env)
     {
-        return new Val(getValue(left->eval()) + getValue(right->eval()), data);
+        return new Val(getValue(left->eval(env)) + getValue(right->eval(env)));
     }
     
     Expression* clone() const
     {
-        return new Add(left->clone(), right->clone(), data);
+        return new Add(left->clone(), right->clone());
     }
     
     ostream& print(ostream& out) const
@@ -147,10 +150,9 @@ class If : public Expression
     Expression* right_cond;
     Expression* e_then;
     Expression* e_else;
-    Env* data;
 
 public:
-    If(Expression* left_cond, Expression* right_cond, Expression* e_then, Expression* e_else, Env* data):left_cond(left_cond), right_cond(right_cond), e_then(e_then), e_else(e_else), data(data){}
+    If(Expression* left_cond, Expression* right_cond, Expression* e_then, Expression* e_else):left_cond(left_cond), right_cond(right_cond), e_then(e_then), e_else(e_else){}
     
     ~If()
     {
@@ -160,16 +162,16 @@ public:
         delete e_else;
     }
     
-    Expression* eval()
+    Expression* eval(Env& env)
     {
-        if(getValue(left_cond->eval()) > getValue(right_cond->eval()))
-            return e_then->eval();
+        if(getValue(left_cond->eval(env)) > getValue(right_cond->eval(env)))
+            return e_then->eval(env);
         else
-            return e_else->eval();
+            return e_else->eval(env);
     }
     Expression* clone() const
     {
-        return new If(left_cond->clone(), right_cond->clone(), e_then->clone(), e_else->clone(), data);
+        return new If(left_cond->clone(), right_cond->clone(), e_then->clone(), e_else->clone());
     }
     
     ostream& print(ostream& out) const
@@ -192,10 +194,9 @@ class Let:public Expression
     string id;
     Expression *e1;
     Expression *e2;
-    Env* data;
     
 public:
-    Let(string id, Expression *e1, Expression *e2, Env* data): id(id), e1(e1), e2(e2), data(data){}
+    Let(string id, Expression *e1, Expression *e2): id(id), e1(e1), e2(e2){}
     
     ~Let()
     {
@@ -203,16 +204,16 @@ public:
         delete e2;
     }
     
-    Expression* eval()
+    Expression* eval(Env& env)
     {
-        Expression *ex = e1->eval();
-        data->env[id] = ex;
-        return e2->eval();
+        Env new_env = env;
+        new_env[id] = e1->eval(env);
+        return e2->eval(new_env);
     }
     
     Expression* clone() const
     {
-        return new Let(id, e1->clone(), e2->clone(),data);
+        return new Let(id, e1->clone(), e2->clone());
     }
     
     ostream& print(ostream& out) const
@@ -229,24 +230,23 @@ class Function:public Expression
 {
     string id;
     Expression *ex1;
-    Env* data;
     friend class Call;
 public:
-    Function(string id, Expression *ex1, Env* data):id(id), ex1(ex1), data(data){}
+    Function(string id, Expression *ex1):id(id), ex1(ex1){}
     
     ~Function()
     {
         delete ex1;
     }
     
-    Expression *eval()
+    Expression *eval(Env& env)
     {
-        return this;
+        return clone();
     }
     
     Expression* clone() const
     {
-        return new Function(id, ex1->clone(), data);
+        return new Function(id, ex1->clone());
     }
     
     ostream& print(ostream& out) const
@@ -263,10 +263,10 @@ class Call: public Expression
 {
     Expression *f_expr;
     Expression *arg_expr;
-    Env *data;
     
 public:
-    Call(Expression *e1, Expression *e2, Env* data):f_expr(e1), arg_expr(e2), data(data){}
+    Call(Expression *e1, Expression *e2):f_expr(e1), arg_expr(e2)
+    {}
     
     ~Call()
     {
@@ -274,9 +274,9 @@ public:
         delete arg_expr;
     }
 
-    Expression *eval()
+    Expression *eval(Env& env)
     {
-        Expression* e_n = f_expr->eval();
+        Expression* e_n = f_expr->eval(env);
         Val *f = dynamic_cast<Val*>(e_n);
         if(f != nullptr)
         {
@@ -284,17 +284,18 @@ public:
         }
         else
         {
+            Env new_env = env;
             Function *func = dynamic_cast<Function*>(e_n);
             string id = func->id;
             Expression* body = func->ex1;
-            data->env[id] = arg_expr->eval();
-            return body->eval();
+            new_env[id] = arg_expr->eval(env);
+            return body->eval(new_env);
         }
     }
     
     Expression *clone() const
     {
-        return new Call(f_expr->clone(), arg_expr->clone(), data);
+        return new Call(f_expr->clone(), arg_expr->clone());
     }
     
     ostream& print(ostream& out) const
@@ -312,24 +313,24 @@ class Set: public Expression
 {
     string id;
     Expression *expr;
-    Env *data;
     
 public:
-    Set(string id, Expression* expr, Env* data):id(id), expr(expr), data(data){};
+    Set(string id, Expression* expr):id(id), expr(expr){};
     
     ~Set()
     {
         delete expr;
     }
     
-    Expression *eval()
+    Expression *eval(Env& env)
     {
-        data->env[id] = expr->eval();
+        Env new_env;
+        new_env[id] = expr->eval(env);
         return this;
     }
     Expression *clone() const
     {
-        return new Set(id, expr->clone(), data);
+        return new Set(id, expr->clone());
     }
     
     ostream& print(ostream& out) const
@@ -344,24 +345,25 @@ public:
 class Block: public Expression
 {
     vector<Expression*> exprs;
-    Env* data;
     
 public:
     
-    Block(vector<Expression*> &s, Env* data):data(data)
+    Block(vector<Expression*> &s)
     {
+        exprs.resize(s.size());
         for(int i = 0; i < s.size(); i++)
-            exprs.push_back(s[i]);
+            exprs[i] = s[i];
     };
     
     ~Block()
     {}
     
-    Expression *eval()
+    Expression *eval(Env& env)
     {
         vector<Expression*> evaluations;
+        evaluations.resize(exprs.size());
         for(int i = 0 ; i < exprs.size(); i++)
-            evaluations.push_back(exprs[i]->eval());
+            evaluations[i] = (exprs[i])->eval(env);
         return evaluations[exprs.size() - 1];
         
     }
@@ -369,9 +371,10 @@ public:
     Expression *clone() const
     {
         vector<Expression*> evs;
+        evs.resize(exprs.size());
         for(int i = 0; i < exprs.size(); i++)
-            evs.push_back(exprs[i]->clone());
-        return new Block(evs, data);
+            evs[i] = exprs[i]->clone();
+        return new Block(evs);
     }
     
     ostream& print(ostream& out) const
@@ -390,25 +393,26 @@ public:
 class Arr: public Expression
 {
     vector<Expression*> arr;
-    Env* data;
     
 public:
     
-    Arr(vector<Expression*> &exprs, Env *data):data(data)
+    Arr(vector<Expression*> &exprs)
     {
+        arr.resize(exprs.size());
         for(int i = 0; i < exprs.size(); i++)
-            arr.push_back(exprs[i]);
+            arr[i] = exprs[i];
     }
     
     ~Arr()
     {}
     
-    Expression *eval()
+    Expression *eval(Env& env)
     {
         vector<Expression*> evals;
+        evals.resize(arr.size());
         for(int i = 0; i < arr.size(); i++)
-            evals.push_back(arr[i]->eval());
-        Expression *arr_eval = new Arr(evals, data);
+            evals[i] = arr[i]->eval(env);
+        Expression *arr_eval = new Arr(evals);
         return arr_eval;
     }
     
@@ -417,7 +421,7 @@ public:
         vector<Expression*> evs;
         for(int i = 0; i < evs.size(); i++)
             evs.push_back(evs[i]->clone());
-        return new Arr(evs, data);
+        return new Arr(evs);
     }
     
     int get_size()
@@ -427,7 +431,7 @@ public:
     
     Expression* operator[](int idx)
     {
-        return arr[idx];
+        return arr.at(idx);
     }
     
     ostream& print(ostream& out) const
@@ -447,10 +451,9 @@ class Gen: public Expression
 {
     Expression* e_length;
     Expression* e_function;
-    Env* data;
     
 public:
-    Gen(Expression *e_length, Expression* e_function, Env* data):e_length(e_length), e_function(e_function), data(data){}
+    Gen(Expression *e_length, Expression* e_function):e_length(e_length), e_function(e_function){}
     
     ~Gen()
     {
@@ -460,19 +463,19 @@ public:
     
     Expression* clone() const
     {
-        return new Gen(e_length->clone(), e_function->clone(), data);
+        return new Gen(e_length->clone(), e_function->clone());
     }
     
-    Expression* eval()
+    Expression* eval(Env& env)
     {
         vector<Expression*> expr;
-        int len = getValue(e_length->eval());
+        int len = getValue(e_length->eval(env));
         for(int i = 0; i < len; i++)
         {
-            Expression* arr_el = new Call(e_function, new Val(i,data), data);
-            expr.push_back(arr_el->eval());
+            Expression* arr_el = new Call(e_function, new Val(i));
+            expr.push_back(arr_el->eval(env));
         }
-        Expression *ret_arr = new Arr(expr, data);
+        Expression *ret_arr = new Arr(expr);
         return ret_arr;
     }
     
@@ -491,10 +494,9 @@ class At: public Expression
 {
     Expression* array;
     Expression* index;
-    Env* data;
 
 public:
-    At(Expression* array, Expression* index, Env* data):array(array), index(index), data(data){}
+    At(Expression* array, Expression* index):array(array), index(index){}
     
     ~At()
     {
@@ -502,13 +504,13 @@ public:
         delete index;
     }
     
-    Expression *eval()
+    Expression *eval(Env& env)
     {
-        Expression* ret_arr = array->eval();
+        Expression* ret_arr = array->eval(env);
         Arr* arr = dynamic_cast<Arr*>(ret_arr);
         if(arr == nullptr)
             throw "Got invalid structure in At class. Need an array!";
-        int x = getValue(index->eval());
+        int x = getValue(index->eval(env));
         if((x < 0) && (x >= arr->get_size()))
            throw "Got invalid index!";
            return (*arr)[x];
@@ -516,7 +518,7 @@ public:
     
     Expression* clone() const
     {
-        return new At(array, index, data);
+        return new At(array, index);
     }
     
     ostream& print(ostream& out) const
@@ -609,7 +611,7 @@ int calculate_number_of_expressions(vector<string> &s, int beginning)
 }
 
 
-Expression* parse(vector<string>& s, Env* e, int &beginning)
+Expression* parse(vector<string>& s, int &beginning)
 {
     Expression* res;
     
@@ -618,32 +620,32 @@ Expression* parse(vector<string>& s, Env* e, int &beginning)
     if (s[beginning] == "val")
     {
         beginning++;
-        res = new Val(stoi(s[beginning]), e);
+        res = new Val(stoi(s[beginning]));
         beginning++;
     }
     else if (s[beginning] == "var")
     {
         beginning++;
-        res = new Var(s[beginning], e);
+        res = new Var(s[beginning]);
         beginning++;
     }
     else if (s[beginning] == "add")
     {
         beginning++;
-        Expression* e1 = parse(s, e, beginning);
-        Expression* e2 = parse(s, e, beginning);
-        res = new Add(e1, e2, e);
+        Expression* e1 = parse(s, beginning);
+        Expression* e2 = parse(s, beginning);
+        res = new Add(e1, e2);
     }
     else if (s[beginning] == "if")
     {
         beginning++;
-        Expression* e1 = parse(s, e, beginning);
-        Expression* e2 = parse(s, e, beginning);
+        Expression* e1 = parse(s, beginning);
+        Expression* e2 = parse(s, beginning);
         beginning++;
-        Expression* e_then = parse(s, e, beginning);
+        Expression* e_then = parse(s, beginning);
         beginning++;
-        Expression* e_else = parse(s, e, beginning);
-        res = new If(e1, e2, e_then, e_else, e);
+        Expression* e_else = parse(s, beginning);
+        res = new If(e1, e2, e_then, e_else);
     }
     else if (s[beginning] == "let")
     {
@@ -651,33 +653,33 @@ Expression* parse(vector<string>& s, Env* e, int &beginning)
         string id = s[beginning];
         beginning++;
         beginning++;
-        Expression* e_val = parse(s,e, beginning);
+        Expression* e_val = parse(s, beginning);
         beginning++;
-        Expression* e_body = parse(s,e, beginning);
-        res = new Let(id, e_val, e_body, e);
+        Expression* e_body = parse(s, beginning);
+        res = new Let(id, e_val, e_body);
     }
     else if (s[beginning] == "function")
     {
         beginning++;
         string id = s[beginning];
         beginning++;
-        Expression* f_body = parse(s, e, beginning);
-        res = new Function(id, f_body, e);
+        Expression* f_body = parse(s, beginning);
+        res = new Function(id, f_body);
     }
     else if (s[beginning] == "call")
     {
         beginning++;
-        Expression* e1 = parse(s, e, beginning);
-        Expression* e2 = parse(s, e, beginning);
-        res = new Call(e1, e2, e);
+        Expression* e1 = parse(s, beginning);
+        Expression* e2 = parse(s, beginning);
+        res = new Call(e1, e2);
     }
     else if (s[beginning] == "set")
     {
         beginning++;
         string id = s[beginning];
         beginning++;
-        Expression* e1 = parse(s, e, beginning);
-        res = new Set(id, e1, e);
+        Expression* e1 = parse(s, beginning);
+        res = new Set(id, e1);
     }
     else if (s[beginning] == "block")
     {
@@ -685,8 +687,8 @@ Expression* parse(vector<string>& s, Env* e, int &beginning)
         int x = calculate_number_of_expressions(s, beginning);
         vector<Expression*> ex;
         for(int i = 0; i < x; i++)
-            ex.push_back(parse(s, e, beginning));
-        res = new Block(ex, e);
+            ex.push_back(parse(s, beginning));
+        res = new Block(ex);
     }
     else if (s[beginning] == "arr")
     {
@@ -694,22 +696,22 @@ Expression* parse(vector<string>& s, Env* e, int &beginning)
         int x = calculate_number_of_expressions(s, beginning);
         vector<Expression*> ex;
         for(int i = 0; i < x; i++)
-            ex.push_back(parse(s, e, beginning));
-        res = new Arr(ex, e);
+            ex.push_back(parse(s, beginning));
+        res = new Arr(ex);
     }
     else if (s[beginning] == "gen")
     {
         beginning++;
-        Expression* e1 = parse(s, e, beginning);
-        Expression* e2 = parse(s, e, beginning);
-        res = new Gen(e1, e2, e);
+        Expression* e1 = parse(s, beginning);
+        Expression* e2 = parse(s, beginning);
+        res = new Gen(e1, e2);
     }
     else if (s[beginning] == "at")
     {
         beginning++;
-        Expression *arr = parse(s, e, beginning);
-        Expression *at = parse(s, e, beginning);
-        res = new At(arr, at, e);
+        Expression *arr = parse(s, beginning);
+        Expression *at = parse(s, beginning);
+        res = new At(arr, at);
     }
     beginning++;
     return res;
@@ -759,21 +761,20 @@ int main()
     in.open("input.txt");
     ofstream out;
     out.open("output.txt");
-    Env e;
     int beginning = 0;
     vector<string> program;
     program = get(in);
-    Expression *ex = parse(program, &e, beginning);
+    Env env;
+    Expression *ex = parse(program, beginning);
     try
     {
-        Expression *ex1 = ex->eval();
-        ex1->print(out);
-        if(getValue(ex1))
-            out << "(val " << getValue(ex1) << ")";
+        Expression *ex1 = ex->eval(env);
+        out << "(val " << getValue(ex1) << ")";
     }
-    catch(...)
+    catch(invalid_argument& e)
     {
         out << "ERROR" << endl;
+        cout << e.what();
     }
     delete ex;
     in.close();
