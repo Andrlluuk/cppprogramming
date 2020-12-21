@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <sstream>
+#include <stack>
 using namespace std;
 
 bool is_digit(char c)
@@ -19,7 +20,22 @@ class Expression;
 
 typedef unordered_map<string, Expression*> Env;
 
+stack<Expression*> memory_stack;
 
+void deallocate(stack<Expression*> mem_stack)
+{
+    int x = 0;
+    while(!mem_stack.empty())
+    {
+        Expression *ex = mem_stack.top();
+        if(ex != nullptr)
+        {
+            delete ex;
+        }
+        mem_stack.pop();
+        x++;
+    }
+}
 class Expression
 {
 public:
@@ -46,7 +62,9 @@ public:
     
     Expression* clone() const
     {
-        return new Val(val);
+        Expression *x = new Val(val);
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -56,13 +74,19 @@ public:
     }
     
     friend int getValue(Expression* ex);
+    
+    ~Val()
+    {}
 };
 
 int getValue(Expression *ex)
 {
     Val *i = dynamic_cast<Val*>(ex);
     if(i != nullptr)
-        return i->val;
+    {
+        int x = i->val;
+        return x;
+    }
     else
     {
         ostringstream out;
@@ -98,7 +122,9 @@ public:
     
     Expression* clone() const
     {
-        return new Var(id);
+        Expression* x = new Var(id);
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -124,12 +150,16 @@ public:
     
     Expression* eval(Env& env)
     {
-        return new Val(getValue(left->eval(env)) + getValue(right->eval(env)));
+        Expression* x = new Val(getValue(left->eval(env)) + getValue(right->eval(env)));
+        memory_stack.push(x);
+        return x;
     }
     
     Expression* clone() const
     {
-        return new Add(left->clone(), right->clone());
+        Expression* x = new Add(left->clone(), right->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -169,9 +199,12 @@ public:
         else
             return e_else->eval(env);
     }
+    
     Expression* clone() const
     {
-        return new If(left_cond->clone(), right_cond->clone(), e_then->clone(), e_else->clone());
+        Expression* x = new If(left_cond->clone(), right_cond->clone(), e_then->clone(), e_else->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -213,7 +246,9 @@ public:
     
     Expression* clone() const
     {
-        return new Let(id, e1->clone(), e2->clone());
+        Expression* x = new Let(id, e1->clone(), e2->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -231,6 +266,7 @@ class Function:public Expression
     string id;
     Expression *ex1;
     friend class Call;
+    
 public:
     Function(string id, Expression *ex1):id(id), ex1(ex1){}
     
@@ -246,7 +282,9 @@ public:
     
     Expression* clone() const
     {
-        return new Function(id, ex1->clone());
+        Expression *x = new Function(id, ex1->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -295,7 +333,9 @@ public:
     
     Expression *clone() const
     {
-        return new Call(f_expr->clone(), arg_expr->clone());
+        Expression *x = new Call(f_expr->clone(), arg_expr->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -330,7 +370,9 @@ public:
     }
     Expression *clone() const
     {
-        return new Set(id, expr->clone());
+        Expression *x = new Set(id, expr->clone());
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -374,7 +416,9 @@ public:
         evs.resize(exprs.size());
         for(int i = 0; i < exprs.size(); i++)
             evs[i] = exprs[i]->clone();
-        return new Block(evs);
+        Expression *x = new Block(evs);
+        memory_stack.push(x);
+        return x;
     }
     
     ostream& print(ostream& out) const
@@ -413,6 +457,7 @@ public:
         for(int i = 0; i < arr.size(); i++)
             evals[i] = arr[i]->eval(env);
         Expression *arr_eval = new Arr(evals);
+        memory_stack.push(arr_eval);
         return arr_eval;
     }
     
@@ -421,7 +466,9 @@ public:
         vector<Expression*> evs;
         for(int i = 0; i < evs.size(); i++)
             evs.push_back(evs[i]->clone());
-        return new Arr(evs);
+        Expression *ex = new Arr(evs);
+        memory_stack.push(ex);
+        return ex;
     }
     
     int get_size()
@@ -463,7 +510,9 @@ public:
     
     Expression* clone() const
     {
-        return new Gen(e_length->clone(), e_function->clone());
+        Expression *ex = new Gen(e_length->clone(), e_function->clone());
+        memory_stack.push(ex);
+        return ex;
     }
     
     Expression* eval(Env& env)
@@ -476,6 +525,7 @@ public:
             expr.push_back(arr_el->eval(env));
         }
         Expression *ret_arr = new Arr(expr);
+        memory_stack.push(ret_arr);
         return ret_arr;
     }
     
@@ -518,7 +568,9 @@ public:
     
     Expression* clone() const
     {
-        return new At(array, index);
+        Expression *ex = new At(array, index);
+        memory_stack.push(ex);
+        return ex;
     }
     
     ostream& print(ostream& out) const
@@ -714,6 +766,7 @@ Expression* parse(vector<string>& s, int &beginning)
         res = new At(arr, at);
     }
     beginning++;
+    memory_stack.push(res);
     return res;
 }
 
@@ -776,8 +829,8 @@ int main()
         out << "ERROR" << endl;
         cout << e.what();
     }
-    delete ex;
     in.close();
     out.close();
+    deallocate(memory_stack);
     return 0;
 }
