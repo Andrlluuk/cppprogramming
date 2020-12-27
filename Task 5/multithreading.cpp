@@ -11,11 +11,8 @@
 using namespace std;
 
 mutex mut;
-mutex checkmut;
-
-
-vector<int> threadIndicator;
-
+mutex other_mut;
+atomic<int> workers(0);
 
 istream& operator >> (istream &in,  string &s)
 {
@@ -33,134 +30,87 @@ istream& operator >> (istream &in,  string &s)
 }
 
 
-bool check(queue<string>& q)
-{
-    checkmut.lock();
-    checkmut.unlock();
-    return q.empty();
-}
-
-
-mutex threadlock;
-
-
-bool threads_work()
-{
-    threadlock.lock();
-    for(auto f: threadIndicator)
-    {
-        if(f)
-        {
-            threadlock.unlock();
-            return true;
-        }
-    }
-    threadlock.unlock();
-    return false;
-}
-
-
 void RaW(queue<string>& q, unordered_set<string>& ind, int id)
 {
     regex rx("<a href=\"file://.*?>");
-    smatch m;
+    smatch m, t;
     string s;
     ifstream in;
     
     
-    while(threads_work())
+    while(true)
     {
-        
-        while(!check(q))
+        while (q.empty())
         {
-            
-            mut.lock();
-            if(q.empty())
-            {
-                mut.unlock();
-                break;
-            }
-            s = q.front();
-                q.pop();
-            mut.unlock();
-            
-            
-            smatch t;
-            regex rg("[0-9]*.html");
-            auto res = regex_search(s, t, rg);
-            string result = "";
-            
-            
-            in.open("test_data/" + t.str());
-            in >> result;
-            in.close();
-            
-            
-            string str = result;
-            while(regex_search(str, m, rx))
-            {
-                mut.lock();
-                if(ind.find(m[0]) == ind.end())
-                {
-                    q.push(m[0]);
-                    ind.insert(m[0]);
-                }
-                mut.unlock();
-                str = m.suffix().str();
-            }
-            
-            
-            ofstream out;
-            out.open("Result_data/readed_" + t.str());
-            out << result;
-            
-            
+            if (workers == 0)
+                return;
         }
-        threadIndicator[id] = false;
+        unique_lock<mutex> lock1(mut);
+        if(q.empty())
+        {
+            break;
+        }
+        workers++;
+        s = q.front();
+        q.pop();
+        lock1.unlock();
+        regex rg("[0-9]*.html");
+        auto res = regex_search(s, t, rg);
+        string result = "";
+
+        in.open("test_data/" + t.str());
+        in >> result;
+        in.close();
+        
+        string str = result;
+        while(regex_search(str, m, rx))
+        {
+            lock_guard<mutex> guard(other_mut);
+            if(ind.find(m[0]) == ind.end())
+            {
+                q.push(m[0]);
+                ind.insert(m[0]);
+            }
+            str = m.suffix().str();
+        }
+        
+        ofstream out;
+        out.open("Result_data/readed_" + t.str());
+        out << result;
+    
+        workers--;
     }
 }
 
 
 int main()
 {
+    auto start = std::chrono::system_clock::now();
     
     unordered_set<string> ind;
     queue<string> q;
     string name_of_file;
     ifstream in;
     int x;
-    
+    vector<thread> threads;
     
     in.open("input.txt");
     getline (in,name_of_file);
     in >> x;
     in.close();
     
-    
     q.push("<a href=\"file://" + name_of_file + ">");
     ind.insert(name_of_file);
     
-    
-    vector<thread> threads;
-    threads.resize(x);
-    threadIndicator.resize(x+1);
-    
     for(int i = 0; i < x; i++)
     {
-        threads[i] = thread(RaW, std::ref(q), std::ref(ind), i);
-        threadIndicator[i] = true;
+        threads.emplace_back(RaW, std::ref(q), std::ref(ind), i);
     }
-    
-    threadIndicator[x] = true;
-    auto start = std::chrono::system_clock::now();
-    RaW(q, ind, x);
-    
     
     for(int i = 0; i < x; i++)
     {
         threads[i].join();
     }
-    
     
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
@@ -170,30 +120,5 @@ int main()
 
 
 
-//optimal solution: 9 threads with time of execution - 57.7 sec
+//optimal solution: 14 threads with time of execution - 12.84 sec with output, 8.21 sec without output
 //1-thread solution: ~155-160 sec
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
